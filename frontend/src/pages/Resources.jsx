@@ -27,7 +27,13 @@ const Resources = () => {
                     { id: 1, name: 'Lab A', type: 'Lab', capacity: 30, location: 'Building 1', status: 'ACTIVE', availabilityWindows: 'Mon-Fri 08:00-18:00' },
                     { id: 2, name: 'Lecture Hall B', type: 'Lecture Hall', capacity: 150, location: 'Building 2', status: 'ACTIVE', availabilityWindows: 'Mon-Fri 08:00-20:00' },
                     { id: 3, name: '4K Projector', type: 'Equipment', capacity: null, location: 'Store Room', status: 'ACTIVE', availabilityWindows: '24/7' },
-                    { id: 4, name: 'Meeting Rm C', type: 'Meeting Room', capacity: 10, location: 'Building 1', status: 'OUT_OF_SERVICE', availabilityWindows: 'Mon-Fri' }
+                    { id: 4, name: 'Meeting Rm C', type: 'Meeting Room', capacity: 10, location: 'Building 1', status: 'OUT_OF_SERVICE', availabilityWindows: 'Mon-Fri' },
+                    { id: 5, name: 'Main Auditorium', type: 'Lecture Hall', capacity: 400, location: 'Building 3', status: 'ACTIVE', availabilityWindows: 'Mon-Sun 08:00-22:00' },
+                    { id: 6, name: 'Robotics Lab', type: 'Lab', capacity: 25, location: 'Building 2', status: 'ACTIVE', availabilityWindows: 'Mon-Fri 09:00-17:00' },
+                    { id: 7, name: 'Oculus VR Kit', type: 'Equipment', capacity: null, location: 'IT Store', status: 'ACTIVE', availabilityWindows: 'Max 3 Days' },
+                    { id: 8, name: 'Sony A7IV Camera', type: 'Equipment', capacity: null, location: 'Media Studio', status: 'ACTIVE', availabilityWindows: 'Mon-Fri 10:00-16:00' },
+                    { id: 9, name: 'Conference Alpha', type: 'Meeting Room', capacity: 20, location: 'Building 1', status: 'ACTIVE', availabilityWindows: 'Mon-Fri 08:00-18:00' },
+                    { id: 10, name: 'Mac Lab', type: 'Lab', capacity: 40, location: 'Building 2', status: 'UNDER_MAINTENANCE', availabilityWindows: 'Unavailable' }
                 ]);
                 setLoading(false);
             });
@@ -48,9 +54,14 @@ const Resources = () => {
     const submitBooking = (e) => {
         e.preventDefault();
         
-        const startRaw = e.target[0].value;
-        const endRaw = e.target[1].value;
+        let startRaw = e.target[0].value;
+        let endRaw = e.target[1].value;
         const purpose = e.target[2].value;
+        const attendeesRaw = e.target[3] ? e.target[3].value : 0;
+        
+        // Ensure standard ISO formatting for Java's LocalDateTime parsing
+        if (startRaw && startRaw.length === 16) startRaw += ":00";
+        if (endRaw && endRaw.length === 16) endRaw += ":00";
         
         const start = new Date(startRaw).getTime();
         const end = new Date(endRaw).getTime();
@@ -60,54 +71,65 @@ const Resources = () => {
             setTimeout(() => setToastMessage(''), 4000);
             return;
         }
-
-        // Overlap Detection Mock
-        const allBookings = JSON.parse(localStorage.getItem('mockBookings') || '[]');
-        const hasConflict = allBookings.some(b => {
-             // Only blocks pending or approved
-             if (b.resource.id === bookingModal.id && (b.status === 'APPROVED' || b.status === 'PENDING')) {
-                 const bStart = new Date(b.startDateTime).getTime();
-                 const bEnd = new Date(b.endDateTime).getTime();
-                 // Overlap arithmetic: (start < bEnd && end > bStart)
-                 return (start < bEnd && end > bStart);
-             }
-             return false;
-        });
-
-        if (hasConflict) {
-             setToastMessage("Warning: Another user has already requested this time slot!");
-             setTimeout(() => setToastMessage(''), 4000);
-             return;
-        }
-
-        // Simulate successful insert
-        const newBooking = {
-             id: Date.now(),
-             userId: user.id,
-             resource: { id: bookingModal.id, name: bookingModal.name },
+        
+        const newBookingAPI = {
+             user: { id: user.id },
+             resource: { id: bookingModal.id },
              startDateTime: startRaw,
              endDateTime: endRaw,
              purpose: purpose,
-             status: 'PENDING',
-             expectedAttendees: 0
+             expectedAttendees: parseInt(attendeesRaw) || 0
         };
-        
-        allBookings.push(newBooking);
-        localStorage.setItem('mockBookings', JSON.stringify(allBookings));
 
-        // Notify Admin
-        const storedNotifs = JSON.parse(localStorage.getItem('mockNotifications') || '[]');
-        storedNotifs.unshift({
-            id: Date.now() + 1,
-            targetUserId: 'ADMIN',
-            message: `New booking request for ${bookingModal.name} by ${user.name}.`,
-            isRead: false
-        });
-        localStorage.setItem('mockNotifications', JSON.stringify(storedNotifs));
+        api.post('/bookings', newBookingAPI)
+           .then(res => {
+               setToastMessage(`Database updated: Booking requested for ${bookingModal.name}!`);
+               setBookingModal(null);
+               setTimeout(() => setToastMessage(''), 4000);
+           })
+           .catch(err => {
+               // Fallback conflict detection if backend offline
+               if (err.response && err.response.status === 400) {
+                    setToastMessage(`Conflict: ${err.response.data || "Time slot already booked!"}`);
+                    setTimeout(() => setToastMessage(''), 4000);
+                    return;
+               }
+               
+               console.error("Backend offline, doing local mock insert:", err);
+               const allBookings = JSON.parse(localStorage.getItem('mockBookings') || '[]');
+               const hasConflict = allBookings.some(b => {
+                    if (b.resource.id === bookingModal.id && (b.status === 'APPROVED' || b.status === 'PENDING')) {
+                        const bStart = new Date(b.startDateTime).getTime();
+                        const bEnd = new Date(b.endDateTime).getTime();
+                        return (start < bEnd && end > bStart);
+                    }
+                    return false;
+               });
 
-        setToastMessage(`Booking created for ${bookingModal.name}. Admin notified!`);
-        setBookingModal(null);
-        setTimeout(() => setToastMessage(''), 4000);
+               if (hasConflict) {
+                    setToastMessage("Warning: Another user has already scheduled this slot limit!");
+                    setTimeout(() => setToastMessage(''), 4000);
+                    return;
+               }
+
+               const newBookingMock = {
+                    id: Date.now(),
+                    userId: user.id,
+                    user: { id: user.id },
+                    resource: { id: bookingModal.id, name: bookingModal.name },
+                    startDateTime: startRaw,
+                    endDateTime: endRaw,
+                    purpose: purpose,
+                    status: 'PENDING',
+                    expectedAttendees: parseInt(attendeesRaw) || 0
+               };
+               allBookings.push(newBookingMock);
+               localStorage.setItem('mockBookings', JSON.stringify(allBookings));
+
+               setToastMessage(`Mock DB updated: Booking created for ${bookingModal.name}.`);
+               setBookingModal(null);
+               setTimeout(() => setToastMessage(''), 4000);
+           });
     };
 
     return (
@@ -206,6 +228,10 @@ const Resources = () => {
                             <div className="input-group">
                                 <label className="input-label">Purpose</label>
                                 <input type="text" placeholder="E.g., Group Study" className="input-field" required />
+                            </div>
+                            <div className="input-group">
+                                <label className="input-label">Expected Attendees</label>
+                                <input type="number" min="0" placeholder="Number of attendees" className="input-field" />
                             </div>
                             <div className="modal-actions">
                                 <button type="button" className="btn btn-outline" onClick={() => setBookingModal(null)}>Cancel</button>

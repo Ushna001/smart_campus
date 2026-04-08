@@ -7,7 +7,8 @@ const api = axios.create({
 // Interceptor to add auth token
 api.interceptors.request.use((config) => {
     const token = localStorage.getItem('token');
-    if (token) {
+    // Prevent Spring Security from dropping the request by throwing InvalidBearerToken fallback on fake signatures
+    if (token && token !== 'MOCKED_JWT_TOKEN') {
         config.headers.Authorization = `Bearer ${token}`;
     }
     return config;

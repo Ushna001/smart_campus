@@ -11,51 +11,43 @@ const Bookings = () => {
     const [filterStatus, setFilterStatus] = useState('ALL');
 
     useEffect(() => {
-        // Read from localStorage to persist mock state
-        const storedBookings = localStorage.getItem('mockBookings');
-        if (storedBookings) {
-            let parsed = JSON.parse(storedBookings);
-            setBookings(user.role === 'ADMIN' ? parsed : parsed.filter(b => b.userId === user.id));
-            setLoading(false);
-        } else {
-            api.get(`/bookings/user/${user.id}`)
-                .then(res => {
-                    setBookings(res.data);
-                    setLoading(false);
-                })
-                .catch(err => {
-                    const mock = [
-                        { id: 1, userId: 2, resource: { id: 1, name: 'Lab A' }, startDateTime: '2026-05-10T09:00:00', endDateTime: '2026-05-10T11:00:00', purpose: 'Group Study', status: 'APPROVED', expectedAttendees: 5 },
-                        { id: 2, userId: 2, resource: { id: 4, name: 'Meeting Rm C' }, startDateTime: '2026-05-12T14:00:00', endDateTime: '2026-05-12T16:00:00', purpose: 'Society Meeting', status: 'PENDING', expectedAttendees: 8 },
-                        { id: 3, userId: 2, resource: { id: 2, name: 'Lecture Hall B' }, startDateTime: '2026-05-11T10:00:00', endDateTime: '2026-05-11T12:00:00', purpose: 'Lab Experiment', status: 'REJECTED', reviewReason: 'Maintenance scheduled' },
-                        { id: 4, userId: 3, resource: { id: 3, name: '4K Projector' }, startDateTime: '2026-05-15T09:00:00', endDateTime: '2026-05-15T12:00:00', purpose: 'Guest Lecture', status: 'PENDING', expectedAttendees: 15 }
-                    ];
-                    localStorage.setItem('mockBookings', JSON.stringify(mock));
-                    setBookings(user.role === 'ADMIN' ? mock : mock.filter(b => b.userId === user.id));
-                    setLoading(false);
-                });
-        }
+        const fetchBookings = user.role === 'ADMIN' 
+            ? api.get('/bookings') 
+            : api.get(`/bookings/user/${user.id}`);
+            
+        fetchBookings
+            .then(res => {
+                setBookings(res.data);
+                setLoading(false);
+            })
+            .catch(err => {
+                // Fallback to local storage or mock if DB is strictly offline
+                console.error("Database offline, falling back locally:", err);
+                const storedBookings = localStorage.getItem('mockBookings');
+                if (storedBookings) {
+                    let parsed = JSON.parse(storedBookings);
+                    setBookings(user.role === 'ADMIN' ? parsed : parsed.filter(b => b.userId === user.id || b.user?.id === user.id));
+                }
+                setLoading(false);
+            });
     }, [user]);
 
-    const handleAction = (id, newStatus) => {
-        const updated = bookings.map(b => b.id === id ? { ...b, status: newStatus } : b);
-        setBookings(updated);
-        
-        // Save back to local storage to mimic backend state preservation
-        const allStored = JSON.parse(localStorage.getItem('mockBookings') || '[]');
-        const globallyUpdated = allStored.map(b => b.id === id ? { ...b, status: newStatus } : b);
-        localStorage.setItem('mockBookings', JSON.stringify(globallyUpdated));
-
-        // Create Admin verification notification for the User
-        const storedNotifs = JSON.parse(localStorage.getItem('mockNotifications') || '[]');
-        const targetBooking = globallyUpdated.find(b => b.id === id);
-        storedNotifs.unshift({
-            id: Date.now(),
-            targetUserId: targetBooking.userId,
-            message: `Your booking request for ${targetBooking.resource.name} has been ${newStatus}.`,
-            isRead: false
-        });
-        localStorage.setItem('mockNotifications', JSON.stringify(storedNotifs));
+    const handleAction = (id, newStatus, reason = null) => {
+        // Attempt to update Database
+        api.patch(`/bookings/${id}/status`, { status: newStatus, reason: reason || 'Processed by Admin' })
+            .then(res => {
+                const updated = bookings.map(b => b.id === id ? { ...b, status: newStatus } : b);
+                setBookings(updated);
+            })
+            .catch(err => {
+                console.error("DB update failed, doing local mutation", err);
+                const updated = bookings.map(b => b.id === id ? { ...b, status: newStatus } : b);
+                setBookings(updated);
+                
+                const allStored = JSON.parse(localStorage.getItem('mockBookings') || '[]');
+                const globallyUpdated = allStored.map(b => b.id === id ? { ...b, status: newStatus } : b);
+                localStorage.setItem('mockBookings', JSON.stringify(globallyUpdated));
+            });
     };
 
     const displayedBookings = bookings.filter(b => filterStatus === 'ALL' || b.status === filterStatus);
@@ -65,6 +57,7 @@ const Bookings = () => {
             case 'APPROVED': return 'badge-active';
             case 'PENDING': return 'badge-pending';
             case 'REJECTED': return 'badge-danger';
+            case 'CANCELLED': return 'badge-info';
             default: return 'badge-info';
         }
     };
@@ -78,7 +71,7 @@ const Bookings = () => {
                 </div>
                 
                 <div className="status-tabs">
-                    {['ALL', 'PENDING', 'APPROVED', 'REJECTED'].map(status => (
+                    {['ALL', 'PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'].map(status => (
                         <button 
                             key={status}
                             className={`tab-btn ${filterStatus === status ? 'active' : ''}`}
@@ -117,8 +110,14 @@ const Bookings = () => {
                                 {user?.role === 'ADMIN' && booking.status === 'PENDING' && (
                                     <div className="admin-actions">
                                         <button onClick={() => handleAction(booking.id, 'APPROVED')} className="icon-btn approve" title="Approve"><FiCheck /></button>
-                                        <button onClick={() => handleAction(booking.id, 'REJECTED')} className="icon-btn reject" title="Reject"><FiX /></button>
+                                        <button onClick={() => handleAction(booking.id, 'REJECTED', 'Rejected logically by Admin')} className="icon-btn reject" title="Reject"><FiX /></button>
                                     </div>
+                                )}
+                                
+                                {user?.role !== 'ADMIN' && booking.status === 'APPROVED' && (
+                                    <button onClick={() => handleAction(booking.id, 'CANCELLED', 'User cancelled')} className="btn btn-outline" style={{padding: '0.2rem 0.5rem', color: 'var(--danger)', borderColor: 'var(--danger)', fontSize: '0.8rem'}}>
+                                        Cancel Booking
+                                    </button>
                                 )}
                             </div>
                         </div>

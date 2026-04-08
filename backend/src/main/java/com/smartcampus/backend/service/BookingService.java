@@ -10,6 +10,9 @@ import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
 import java.util.List;
+import com.smartcampus.backend.model.entity.CampusResource;
+import com.smartcampus.backend.model.entity.User;
+import com.smartcampus.backend.repository.UserRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -18,10 +21,16 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final NotificationService notificationService;
     private final ResourceService resourceService; // To validate resource
+    private final UserRepository userRepository;
 
     public Booking createBooking(Booking booking) {
-        // Validate resource exists
-        resourceService.getResourceById(booking.getResource().getId());
+        // Fetch managed entities to prevent TransientObjectException
+        CampusResource resource = resourceService.getResourceById(booking.getResource().getId());
+        User user = userRepository.findById(booking.getUser().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + booking.getUser().getId()));
+
+        booking.setResource(resource);
+        booking.setUser(user);
 
         if (booking.getStartDateTime().isAfter(booking.getEndDateTime())) {
             throw new BadRequestException("Start time must be before end time");
