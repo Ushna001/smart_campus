@@ -28,10 +28,20 @@ public class NotificationService {
         return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 
+    public long getUnreadCount(Long userId) {
+        return notificationRepository.countByUserIdAndReadFalse(userId);
+    }
+
     public Notification markAsRead(Long id) {
         Notification notification = notificationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
         notification.setRead(true);
         return notificationRepository.save(notification);
+    }
+
+    public void markAllAsRead(Long userId) {
+        List<Notification> unread = notificationRepository.findByUserIdAndReadFalse(userId);
+        unread.forEach(n -> n.setRead(true));
+        notificationRepository.saveAll(unread);
     }
 }
