@@ -1,6 +1,7 @@
 package com.smartcampus.backend.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.smartcampus.backend.model.entity.Comment;
 import com.smartcampus.backend.model.entity.Ticket;
 import com.smartcampus.backend.model.entity.TicketAttachment;
@@ -21,13 +22,14 @@ import java.util.Map;
 public class TicketController {
 
     private final TicketService ticketService;
-    private final ObjectMapper objectMapper;
 
     @PostMapping
     public ResponseEntity<Ticket> createTicket(
             @RequestPart("ticket") String ticketJson,
             @RequestPart(value = "files", required = false) MultipartFile[] files) throws Exception {
         
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
         Ticket ticket = objectMapper.readValue(ticketJson, Ticket.class);
         return new ResponseEntity<>(ticketService.createTicket(ticket, files), HttpStatus.CREATED);
     }

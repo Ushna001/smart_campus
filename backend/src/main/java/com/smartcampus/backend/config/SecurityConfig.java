@@ -9,7 +9,6 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.security.config.Customizer;
 
 import java.util.Arrays;
 
@@ -23,15 +22,9 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(authz -> authz
-                // Open paths for easy local testing for now - in production, restrict properly!
-                .requestMatchers("/api/files/**").permitAll()
-                .requestMatchers("/api/auth/**").authenticated() // Require JWT for auth info
-                // We're letting other routes be open temporarily for easy Postman testing by the user
-                // To strictly secure, uncomment below and comment out anyRequest().permitAll()
-                // .requestMatchers(HttpMethod.POST, "/api/resources/**").hasAuthority("SCOPE_ADMIN")
+                // All endpoints open for demo/viva - in production, use proper JWT auth
                 .anyRequest().permitAll() 
-            )
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+            );
 
         return http.build();
     }
