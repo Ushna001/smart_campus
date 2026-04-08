@@ -28,19 +28,19 @@ public class ResourceController {
         return ResponseEntity.ok(resourceService.getResourceById(id));
     }
 
-    @PostMapping
+    @PostMapping("/admin")
     public ResponseEntity<CampusResource> createResource(@RequestBody CampusResource resource) {
         return new ResponseEntity<>(resourceService.createResource(resource), HttpStatus.CREATED);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/admin/{id}")
     public ResponseEntity<CampusResource> updateResource(
             @PathVariable Long id, 
             @RequestBody CampusResource resource) {
         return ResponseEntity.ok(resourceService.updateResource(id, resource));
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/admin/{id}")
     public ResponseEntity<Void> deleteResource(@PathVariable Long id) {
         resourceService.deleteResource(id);
         return ResponseEntity.noContent().build();

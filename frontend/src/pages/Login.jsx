@@ -1,10 +1,20 @@
-import React, { useContext } from 'react';
+import React, { useContext, useEffect } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { FiShield, FiUser } from 'react-icons/fi';
 import './Login.css';
 
 const Login = () => {
-    const { login } = useContext(AuthContext);
+    const { login, GOOGLE_CLIENT_ID } = useContext(AuthContext);
+
+    useEffect(() => {
+        // Render the Google Sign-In button if SDK is loaded
+        if (window.google) {
+            window.google.accounts.id.renderButton(
+                document.getElementById("googleSignInButton"),
+                { theme: "outline", size: "large", width: "100%" }
+            );
+        }
+    }, []);
 
     return (
         <div className="login-container">
@@ -12,19 +22,27 @@ const Login = () => {
                 <div className="login-header">
                     <div className="brand-logo">SC</div>
                     <h2>SmartCampus Hub</h2>
-                    <p>Welcome back! Select a mock role to sign in.</p>
+                    <p>Welcome back! Securely sign in to your campus account.</p>
                 </div>
 
                 <div className="login-actions">
-                    <button onClick={() => login('USER')} className="btn btn-outline login-btn">
-                        <FiUser size={20} />
-                        Sign in as Student (User)
-                    </button>
+                    {/* Real Google Login Button */}
+                    <div id="googleSignInButton" className="google-btn-wrapper"></div>
                     
-                    <button onClick={() => login('ADMIN')} className="btn btn-primary login-btn">
-                        <FiShield size={20} />
-                        Sign in as Admin
-                    </button>
+                    <div className="divider">
+                        <span>OR</span>
+                    </div>
+
+                    <p className="demo-hint text-muted">Demo Mock Roles:</p>
+                    <div className="mock-actions">
+                        <button onClick={() => login('USER')} className="btn btn-outline login-btn">
+                            <FiUser size={18} /> Student
+                        </button>
+                        
+                        <button onClick={() => login('ADMIN')} className="btn btn-primary login-btn">
+                            <FiShield size={18} /> Admin
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

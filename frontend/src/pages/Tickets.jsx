@@ -103,7 +103,7 @@ const Tickets = () => {
 
     const handleAssignTechnician = (ticketId) => {
         // Assign to technician (user ID 3 from seed data)
-        api.patch(`/tickets/${ticketId}/assign`, { assigneeId: 3 })
+        api.patch(`/tickets/admin/${ticketId}/assign`, { assigneeId: 3 })
             .then(res => {
                 setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: 'IN_PROGRESS', assignee: { id: 3, name: 'James Technician' } } : t));
                 showToast(`Technician assigned to ticket #${ticketId}`);

@@ -59,7 +59,7 @@ public class TicketController {
         return ResponseEntity.ok(ticketService.updateTicketStatus(id, status, resolutionNotes));
     }
 
-    @PatchMapping("/{id}/assign")
+    @PatchMapping("/admin/{id}/assign")
     public ResponseEntity<Ticket> assignTicket(
             @PathVariable Long id,
             @RequestBody Map<String, Long> body) {

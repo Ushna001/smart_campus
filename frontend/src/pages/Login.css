@@ -36,7 +36,7 @@
 .login-header p {
     color: var(--text-muted);
     font-size: 0.9rem;
-    margin-bottom: 2.5rem;
+    margin-bottom: 2rem;
 }
 
 .login-actions {
@@ -45,9 +45,54 @@
     gap: 1rem;
 }
 
-.login-btn {
-    width: 100%;
-    height: 48px;
+.google-btn-wrapper {
+    margin-bottom: 0.5rem;
+}
+
+.divider {
     display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 1rem 0;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.divider:not(:empty)::before {
+    margin-right: .75rem;
+}
+
+.divider:not(:empty)::after {
+    margin-left: .75rem;
+}
+
+.divider span {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.demo-hint {
+    font-size: 0.8rem;
+    margin-bottom: 0.5rem;
+}
+
+.mock-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.login-btn {
+    flex: 1;
+    height: 42px;
+    display: flex;
+    align-items: center;
     justify-content: center;
+    gap: 0.4rem;
+    font-size: 0.9rem;
 }

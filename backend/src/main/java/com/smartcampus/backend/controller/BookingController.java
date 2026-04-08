@@ -38,7 +38,7 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.getBookingById(id));
     }
 
-    @PatchMapping("/{id}/status")
+    @PatchMapping("/admin/{id}/status")
     public ResponseEntity<Booking> updateBookingStatus(
             @PathVariable Long id, 
             @RequestBody Map<String, String> body) {

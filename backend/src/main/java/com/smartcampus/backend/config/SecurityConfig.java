@@ -10,11 +10,20 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import org.springframework.security.config.Customizer;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import com.smartcampus.backend.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import java.util.Collections;
 import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
+
+    private final UserRepository userRepository;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -22,11 +31,36 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(authz -> authz
-                // All endpoints open for demo/viva - in production, use proper JWT auth
-                .anyRequest().permitAll() 
-            );
+                // Public access
+                .requestMatchers("/api/auth/me").permitAll()
+                .requestMatchers("/api/resources/**").permitAll()
+                
+                // Admin only operations
+                .requestMatchers("/api/bookings/admin/**").hasAuthority("ROLE_ADMIN")
+                .requestMatchers("/api/resources/admin/**").hasAuthority("ROLE_ADMIN")
+                .requestMatchers("/api/tickets/admin/**").hasAuthority("ROLE_ADMIN")
+                
+                // Technician / Staff access (Status updates)
+                .requestMatchers(HttpMethod.PATCH, "/api/tickets/*/status").hasAnyAuthority("ROLE_ADMIN", "ROLE_TECHNICIAN")
+                
+                // Authenticated access for everything else
+                .anyRequest().authenticated()
+            )
+            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
 
         return http.build();
+    }
+
+    @Bean
+    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+        converter.setJwtGrantedAuthoritiesConverter(jwt -> {
+            String email = jwt.getClaimAsString("email");
+            return userRepository.findByEmail(email)
+                .map(user -> (java.util.Collection<org.springframework.security.core.GrantedAuthority>) Collections.singleton(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())))
+                .orElse(Collections.emptySet());
+        });
+        return converter;
     }
 
     @Bean

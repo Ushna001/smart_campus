@@ -34,7 +34,7 @@ const Bookings = () => {
 
     const handleAction = (id, newStatus, reason = null) => {
         // Attempt to update Database
-        api.patch(`/bookings/${id}/status`, { status: newStatus, reason: reason || 'Processed by Admin' })
+        api.patch(`/bookings/admin/${id}/status`, { status: newStatus, reason: reason || 'Processed by Admin' })
             .then(res => {
                 const updated = bookings.map(b => b.id === id ? { ...b, status: newStatus } : b);
                 setBookings(updated);
