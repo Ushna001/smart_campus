@@ -19,9 +19,9 @@ public class CampusResource {
     private String name;
 
     @Column(nullable = false)
-    private String type; // e.g., Lab, Lecture Hall, Equipment
+    private String type;
 
-    private Integer capacity; // Can be null for equipment
+    private Integer capacity;
 
     @Column(nullable = false)
     private String location;

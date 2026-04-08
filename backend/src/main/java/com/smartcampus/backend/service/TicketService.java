@@ -1,13 +1,16 @@
 package com.smartcampus.backend.service;
 
+import com.smartcampus.backend.exception.BadRequestException;
 import com.smartcampus.backend.exception.ResourceNotFoundException;
 import com.smartcampus.backend.model.entity.Comment;
 import com.smartcampus.backend.model.entity.Ticket;
 import com.smartcampus.backend.model.entity.TicketAttachment;
+import com.smartcampus.backend.model.entity.User;
 import com.smartcampus.backend.model.enums.TicketStatus;
 import com.smartcampus.backend.repository.CommentRepository;
 import com.smartcampus.backend.repository.TicketAttachmentRepository;
 import com.smartcampus.backend.repository.TicketRepository;
+import com.smartcampus.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,15 +26,25 @@ public class TicketService {
     private final TicketAttachmentRepository ticketAttachmentRepository;
     private final NotificationService notificationService;
     private final FileStorageService fileStorageService;
+    private final UserRepository userRepository;
 
     public Ticket createTicket(Ticket ticket, MultipartFile[] files) {
+        // Resolve managed user entity
+        if (ticket.getCreator() != null && ticket.getCreator().getId() != null) {
+            User creator = userRepository.findById(ticket.getCreator().getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+            ticket.setCreator(creator);
+        }
+
         ticket.setStatus(TicketStatus.OPEN);
         Ticket savedTicket = ticketRepository.save(ticket);
 
+        // Handle up to 3 image attachments
         if (files != null && files.length > 0) {
-            for (MultipartFile file : files) {
-                if (!file.isEmpty()) {
-                    String fileUrl = fileStorageService.storeFile(file);
+            int maxAttachments = Math.min(files.length, 3);
+            for (int i = 0; i < maxAttachments; i++) {
+                if (!files[i].isEmpty()) {
+                    String fileUrl = fileStorageService.storeFile(files[i]);
                     TicketAttachment attachment = TicketAttachment.builder()
                             .ticket(savedTicket)
                             .imageUrl(fileUrl)
@@ -74,20 +87,77 @@ public class TicketService {
         return updated;
     }
 
+    public Ticket assignTicket(Long ticketId, Long assigneeId) {
+        Ticket ticket = getTicketById(ticketId);
+        User assignee = userRepository.findById(assigneeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignee not found"));
+        
+        ticket.setAssignee(assignee);
+        ticket.setStatus(TicketStatus.IN_PROGRESS);
+        Ticket updated = ticketRepository.save(ticket);
+
+        // Notify the assigned technician
+        notificationService.createNotification(
+                assignee,
+                "You have been assigned to ticket #" + ticket.getId() + ": " + ticket.getDescription()
+        );
+
+        // Notify the ticket creator
+        notificationService.createNotification(
+                ticket.getCreator(),
+                "Your ticket #" + ticket.getId() + " has been assigned to " + assignee.getName()
+        );
+
+        return updated;
+    }
+
     public Comment addComment(Long ticketId, Comment comment) {
         Ticket ticket = getTicketById(ticketId);
         comment.setTicket(ticket);
+
+        // Resolve user entity
+        if (comment.getUser() != null && comment.getUser().getId() != null) {
+            User user = userRepository.findById(comment.getUser().getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+            comment.setUser(user);
+        }
+
         Comment savedComment = commentRepository.save(comment);
 
         // Notify Ticket Creator if the comment is from someone else
         if (!ticket.getCreator().getId().equals(comment.getUser().getId())) {
              notificationService.createNotification(
                      ticket.getCreator(),
-                     "A new comment was added to your ticket (ID: " + ticket.getId() + ")."
+                     comment.getUser().getName() + " commented on your ticket #" + ticket.getId()
              );
         }
         
         return savedComment;
+    }
+
+    public Comment updateComment(Long commentId, Long userId, String newContent) {
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
+        
+        // Ownership check: only the author can edit their comment
+        if (!comment.getUser().getId().equals(userId)) {
+            throw new BadRequestException("You can only edit your own comments");
+        }
+
+        comment.setContent(newContent);
+        return commentRepository.save(comment);
+    }
+
+    public void deleteComment(Long commentId, Long userId) {
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
+        
+        // Ownership check: only the author or admin can delete
+        if (!comment.getUser().getId().equals(userId)) {
+            throw new BadRequestException("You can only delete your own comments");
+        }
+
+        commentRepository.delete(comment);
     }
 
     public List<Comment> getTicketComments(Long ticketId) {

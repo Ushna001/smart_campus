@@ -39,6 +39,11 @@ public class TicketController {
         return ResponseEntity.ok(ticketService.getAllTickets());
     }
 
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<Ticket>> getUserTickets(@PathVariable Long userId) {
+        return ResponseEntity.ok(ticketService.getUserTickets(userId));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<Ticket> getTicketById(@PathVariable Long id) {
         return ResponseEntity.ok(ticketService.getTicketById(id));
@@ -54,6 +59,14 @@ public class TicketController {
         return ResponseEntity.ok(ticketService.updateTicketStatus(id, status, resolutionNotes));
     }
 
+    @PatchMapping("/{id}/assign")
+    public ResponseEntity<Ticket> assignTicket(
+            @PathVariable Long id,
+            @RequestBody Map<String, Long> body) {
+        Long assigneeId = body.get("assigneeId");
+        return ResponseEntity.ok(ticketService.assignTicket(id, assigneeId));
+    }
+
     // Comments Endpoints
     @PostMapping("/{id}/comments")
     public ResponseEntity<Comment> addComment(
@@ -65,6 +78,23 @@ public class TicketController {
     @GetMapping("/{id}/comments")
     public ResponseEntity<List<Comment>> getTicketComments(@PathVariable Long id) {
         return ResponseEntity.ok(ticketService.getTicketComments(id));
+    }
+
+    @PutMapping("/comments/{commentId}")
+    public ResponseEntity<Comment> updateComment(
+            @PathVariable Long commentId,
+            @RequestBody Map<String, String> body) {
+        Long userId = Long.parseLong(body.get("userId"));
+        String content = body.get("content");
+        return ResponseEntity.ok(ticketService.updateComment(commentId, userId, content));
+    }
+
+    @DeleteMapping("/comments/{commentId}")
+    public ResponseEntity<Void> deleteComment(
+            @PathVariable Long commentId,
+            @RequestParam Long userId) {
+        ticketService.deleteComment(commentId, userId);
+        return ResponseEntity.noContent().build();
     }
     
     @GetMapping("/{id}/attachments")

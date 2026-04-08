@@ -1,34 +1,183 @@
 import React, { useState, useEffect, useContext } from 'react';
 import api from '../services/api';
 import { AuthContext } from '../context/AuthContext';
-import { FiMessageSquare, FiAlertCircle, FiPaperclip } from 'react-icons/fi';
+import { FiMessageSquare, FiAlertCircle, FiPaperclip, FiX, FiCheck, FiChevronRight, FiSend, FiEdit2, FiTrash2, FiUserPlus } from 'react-icons/fi';
 import './Tickets.css';
 
 const Tickets = () => {
     const { user } = useContext(AuthContext);
     const [tickets, setTickets] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [selectedTicket, setSelectedTicket] = useState(null);
+    const [comments, setComments] = useState([]);
+    const [newComment, setNewComment] = useState('');
+    const [editingComment, setEditingComment] = useState(null);
+    const [filterStatus, setFilterStatus] = useState('ALL');
+    const [toastMessage, setToastMessage] = useState('');
 
     useEffect(() => {
-        api.get('/tickets')
-            .then(res => setTickets(res.data))
+        fetchTickets();
+    }, [user]);
+
+    const fetchTickets = () => {
+        const endpoint = user?.role === 'ADMIN' ? '/tickets' : `/tickets/user/${user?.id}`;
+        api.get(endpoint)
+            .then(res => {
+                setTickets(res.data);
+                setLoading(false);
+            })
             .catch(err => {
+                console.error("Backend offline, using mock data", err);
                 const mock = [
-                    { id: 1, category: 'Equipment', location: 'IT Store Room', priority: 'HIGH', status: 'IN_PROGRESS', description: 'Projector starts flickering after 10 mins of usage', createdAt: new Date().toISOString(), comments: 2 },
-                    { id: 2, category: 'Network', location: 'Building 1 - 1st Floor', priority: 'MEDIUM', status: 'OPEN', description: 'No Wi-Fi signal in the right corner', createdAt: new Date(Date.now() - 86400000).toISOString(), comments: 0 }
+                    { id: 1, category: 'Equipment', location: 'IT Store Room', priority: 'HIGH', status: 'IN_PROGRESS', description: 'Projector starts flickering after 10 mins of usage', creator: { id: 2, name: 'John Doe' }, assignee: { id: 3, name: 'James Technician' }, createdAt: new Date().toISOString(), contactDetails: '+94711234567' },
+                    { id: 2, category: 'Network', location: 'Building 1 - 1st Floor', priority: 'MEDIUM', status: 'OPEN', description: 'No Wi-Fi signal in the right corner of Lab A', creator: { id: 2, name: 'John Doe' }, assignee: null, createdAt: new Date(Date.now() - 86400000).toISOString(), contactDetails: '+94711234567' }
                 ];
                 setTickets(mock);
                 setLoading(false);
             });
-    }, []);
+    };
+
+    const showToast = (msg) => {
+        setToastMessage(msg);
+        setTimeout(() => setToastMessage(''), 4000);
+    };
+
+    const handleCreateTicket = (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        
+        const ticketData = {
+            creator: { id: user.id },
+            location: formData.get('location'),
+            category: formData.get('category'),
+            description: formData.get('description'),
+            priority: formData.get('priority'),
+            contactDetails: formData.get('contactDetails')
+        };
+
+        const fd = new FormData();
+        fd.append('ticket', new Blob([JSON.stringify(ticketData)], { type: 'application/json' }));
+        
+        // Attach up to 3 files
+        const files = formData.getAll('files');
+        files.slice(0, 3).forEach(file => {
+            if (file.size > 0) fd.append('files', file);
+        });
+
+        api.post('/tickets', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+            .then(res => {
+                showToast('Ticket created successfully!');
+                setShowCreateModal(false);
+                fetchTickets();
+            })
+            .catch(err => {
+                console.error("Error creating ticket:", err);
+                // Fallback mock
+                const newTicket = {
+                    id: Date.now(),
+                    ...ticketData,
+                    creator: { id: user.id, name: user.name },
+                    status: 'OPEN',
+                    createdAt: new Date().toISOString(),
+                    assignee: null
+                };
+                setTickets(prev => [newTicket, ...prev]);
+                setShowCreateModal(false);
+                showToast('Ticket created (locally)!');
+            });
+    };
+
+    const handleStatusChange = (ticketId, newStatus, resolutionNotes = '') => {
+        api.patch(`/tickets/${ticketId}/status`, { status: newStatus, resolutionNotes })
+            .then(res => {
+                setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: newStatus, resolutionNotes } : t));
+                if (selectedTicket?.id === ticketId) setSelectedTicket(prev => ({ ...prev, status: newStatus, resolutionNotes }));
+                showToast(`Ticket #${ticketId} updated to ${newStatus}`);
+            })
+            .catch(err => {
+                setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: newStatus } : t));
+                showToast(`Ticket #${ticketId} updated locally to ${newStatus}`);
+            });
+    };
+
+    const handleAssignTechnician = (ticketId) => {
+        // Assign to technician (user ID 3 from seed data)
+        api.patch(`/tickets/${ticketId}/assign`, { assigneeId: 3 })
+            .then(res => {
+                setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: 'IN_PROGRESS', assignee: { id: 3, name: 'James Technician' } } : t));
+                showToast(`Technician assigned to ticket #${ticketId}`);
+            })
+            .catch(err => {
+                setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: 'IN_PROGRESS', assignee: { id: 3, name: 'James Technician' } } : t));
+                showToast(`Technician assigned locally to ticket #${ticketId}`);
+            });
+    };
+
+    const openTicketDetail = (ticket) => {
+        setSelectedTicket(ticket);
+        api.get(`/tickets/${ticket.id}/comments`)
+            .then(res => setComments(res.data))
+            .catch(() => setComments([]));
+    };
+
+    const handleAddComment = () => {
+        if (!newComment.trim()) return;
+        const commentData = { user: { id: user.id }, content: newComment };
+        
+        api.post(`/tickets/${selectedTicket.id}/comments`, commentData)
+            .then(res => {
+                setComments(prev => [...prev, res.data]);
+                setNewComment('');
+            })
+            .catch(() => {
+                const mockComment = { id: Date.now(), user: { id: user.id, name: user.name }, content: newComment, createdAt: new Date().toISOString() };
+                setComments(prev => [...prev, mockComment]);
+                setNewComment('');
+            });
+    };
+
+    const handleEditComment = (commentId) => {
+        const content = editingComment.content;
+        api.put(`/tickets/comments/${commentId}`, { userId: String(user.id), content })
+            .then(res => {
+                setComments(prev => prev.map(c => c.id === commentId ? { ...c, content } : c));
+                setEditingComment(null);
+            })
+            .catch(() => {
+                setComments(prev => prev.map(c => c.id === commentId ? { ...c, content } : c));
+                setEditingComment(null);
+            });
+    };
+
+    const handleDeleteComment = (commentId) => {
+        api.delete(`/tickets/comments/${commentId}?userId=${user.id}`)
+            .then(() => setComments(prev => prev.filter(c => c.id !== commentId)))
+            .catch(() => setComments(prev => prev.filter(c => c.id !== commentId)));
+    };
 
     const getPriorityColor = (priority) => {
         switch(priority) {
             case 'CRITICAL': return 'var(--danger)';
             case 'HIGH': return 'var(--warning)';
+            case 'MEDIUM': return 'var(--accent)';
+            case 'LOW': return 'var(--success)';
             default: return 'var(--accent)';
         }
     };
+
+    const getStatusBadge = (status) => {
+        switch(status) {
+            case 'OPEN': return 'badge-pending';
+            case 'IN_PROGRESS': return 'badge-info';
+            case 'RESOLVED': return 'badge-active';
+            case 'CLOSED': return 'badge-info';
+            case 'REJECTED': return 'badge-danger';
+            default: return 'badge-info';
+        }
+    };
+
+    const displayedTickets = tickets.filter(t => filterStatus === 'ALL' || t.status === filterStatus);
 
     return (
         <div className="tickets-page animate-fade-in">
@@ -37,13 +186,29 @@ const Tickets = () => {
                     <h1>Incident Tickets</h1>
                     <p>Report issues and track maintenance progress.</p>
                 </div>
-                <button className="btn btn-primary">+ Raise Ticket</button>
+                {user?.role !== 'ADMIN' && (
+                    <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>+ Raise Ticket</button>
+                )}
             </header>
+
+            {/* Status Filter Tabs */}
+            <div className="status-tabs" style={{ marginBottom: '1.5rem' }}>
+                {['ALL', 'OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'REJECTED'].map(status => (
+                    <button
+                        key={status}
+                        className={`tab-btn ${filterStatus === status ? 'active' : ''}`}
+                        onClick={() => setFilterStatus(status)}
+                    >
+                        {status.replace('_', ' ')}
+                    </button>
+                ))}
+            </div>
 
             {loading ? <div className="loading-state">Loading...</div> : (
                 <div className="tickets-grid">
-                    {tickets.map(ticket => (
-                        <div key={ticket.id} className="glass-panel ticket-card" style={{borderLeft: `4px solid ${getPriorityColor(ticket.priority)}`}}>
+                    {displayedTickets.length === 0 && <p style={{ color: 'var(--text-muted)' }}>No tickets found for this filter.</p>}
+                    {displayedTickets.map(ticket => (
+                        <div key={ticket.id} className="glass-panel ticket-card" style={{borderLeft: `4px solid ${getPriorityColor(ticket.priority)}`}} onClick={() => openTicketDetail(ticket)}>
                             <div className="ticket-header">
                                 <span className="ticket-category">{ticket.category}</span>
                                 <span className="ticket-id">#{ticket.id}</span>
@@ -51,18 +216,197 @@ const Tickets = () => {
                             
                             <h4><FiAlertCircle style={{color: getPriorityColor(ticket.priority)}}/> {ticket.location}</h4>
                             <p className="ticket-desc">{ticket.description}</p>
+
+                            {ticket.assignee && (
+                                <p className="ticket-assignee">
+                                    <FiUserPlus size={14} /> Assigned to: <strong>{ticket.assignee.name}</strong>
+                                </p>
+                            )}
                             
                             <div className="ticket-footer">
                                 <div className="ticket-stats">
-                                    <span title="Comments"><FiMessageSquare /> {ticket.comments || 0}</span>
-                                    <span title="Attachments"><FiPaperclip /> {ticket.id === 1 ? 1 : 0}</span>
+                                    <span title="Priority" style={{color: getPriorityColor(ticket.priority), fontWeight: 600, fontSize: '0.8rem'}}>{ticket.priority}</span>
+                                    <span title="Created">{new Date(ticket.createdAt).toLocaleDateString()}</span>
                                 </div>
-                                <span className={`badge ${ticket.status === 'IN_PROGRESS' ? 'badge-info' : 'badge-pending'}`}>
+                                <span className={`badge ${getStatusBadge(ticket.status)}`}>
                                     {ticket.status.replace('_', ' ')}
                                 </span>
                             </div>
+
+                            {/* Admin Actions */}
+                            {user?.role === 'ADMIN' && ticket.status === 'OPEN' && (
+                                <div className="admin-ticket-actions" onClick={e => e.stopPropagation()}>
+                                    <button className="icon-btn approve" title="Assign Technician" onClick={() => handleAssignTechnician(ticket.id)}><FiUserPlus /></button>
+                                    <button className="icon-btn reject" title="Reject" onClick={() => handleStatusChange(ticket.id, 'REJECTED', 'Not a valid issue')}><FiX /></button>
+                                </div>
+                            )}
+                            {user?.role === 'ADMIN' && ticket.status === 'IN_PROGRESS' && (
+                                <div className="admin-ticket-actions" onClick={e => e.stopPropagation()}>
+                                    <button className="icon-btn approve" title="Mark Resolved" onClick={() => handleStatusChange(ticket.id, 'RESOLVED', 'Issue fixed')}><FiCheck /></button>
+                                </div>
+                            )}
+                            {user?.role === 'ADMIN' && ticket.status === 'RESOLVED' && (
+                                <div className="admin-ticket-actions" onClick={e => e.stopPropagation()}>
+                                    <button className="icon-btn approve" title="Close Ticket" onClick={() => handleStatusChange(ticket.id, 'CLOSED')}><FiCheck /></button>
+                                </div>
+                            )}
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* Toast Notification */}
+            {toastMessage && <div className="toast-notification show">{toastMessage}</div>}
+
+            {/* Create Ticket Modal */}
+            {showCreateModal && (
+                <div className="modal-backdrop" onClick={() => setShowCreateModal(false)}>
+                    <div className="modal glass-panel" onClick={e => e.stopPropagation()}>
+                        <h2>Raise New Ticket</h2>
+                        <form onSubmit={handleCreateTicket}>
+                            <div className="input-group">
+                                <label className="input-label">Category</label>
+                                <select name="category" className="input-field" required>
+                                    <option value="">Select Category</option>
+                                    <option value="Equipment">Equipment</option>
+                                    <option value="Network">Network</option>
+                                    <option value="Electrical">Electrical</option>
+                                    <option value="Plumbing">Plumbing</option>
+                                    <option value="HVAC">HVAC / Air Conditioning</option>
+                                    <option value="Furniture">Furniture</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div className="input-group">
+                                <label className="input-label">Location</label>
+                                <input type="text" name="location" placeholder="E.g., Building 1 - Lab A" className="input-field" required />
+                            </div>
+                            <div className="input-group">
+                                <label className="input-label">Description</label>
+                                <textarea name="description" placeholder="Describe the issue in detail..." className="input-field" rows="3" required></textarea>
+                            </div>
+                            <div className="input-group">
+                                <label className="input-label">Priority</label>
+                                <select name="priority" className="input-field" required>
+                                    <option value="LOW">Low</option>
+                                    <option value="MEDIUM" selected>Medium</option>
+                                    <option value="HIGH">High</option>
+                                    <option value="CRITICAL">Critical</option>
+                                </select>
+                            </div>
+                            <div className="input-group">
+                                <label className="input-label">Contact Details</label>
+                                <input type="text" name="contactDetails" placeholder="Phone or email" className="input-field" />
+                            </div>
+                            <div className="input-group">
+                                <label className="input-label">Evidence Images (max 3)</label>
+                                <input type="file" name="files" multiple accept="image/*" className="input-field" />
+                                <small style={{color: 'var(--text-muted)'}}>Attach photos of the damage or error screen</small>
+                            </div>
+                            <div className="modal-actions">
+                                <button type="button" className="btn btn-outline" onClick={() => setShowCreateModal(false)}>Cancel</button>
+                                <button type="submit" className="btn btn-primary">Submit Ticket</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Ticket Detail Slide-over */}
+            {selectedTicket && (
+                <div className="modal-backdrop" onClick={() => { setSelectedTicket(null); setComments([]); }}>
+                    <div className="ticket-detail-panel glass-panel" onClick={e => e.stopPropagation()}>
+                        <div className="detail-header">
+                            <div>
+                                <h2>Ticket #{selectedTicket.id}</h2>
+                                <span className={`badge ${getStatusBadge(selectedTicket.status)}`}>{selectedTicket.status.replace('_', ' ')}</span>
+                            </div>
+                            <button className="btn btn-outline" onClick={() => { setSelectedTicket(null); setComments([]); }}><FiX /></button>
+                        </div>
+
+                        <div className="detail-body">
+                            <div className="detail-field">
+                                <label>Category</label><span>{selectedTicket.category}</span>
+                            </div>
+                            <div className="detail-field">
+                                <label>Location</label><span>{selectedTicket.location}</span>
+                            </div>
+                            <div className="detail-field">
+                                <label>Priority</label>
+                                <span style={{color: getPriorityColor(selectedTicket.priority), fontWeight: 700}}>{selectedTicket.priority}</span>
+                            </div>
+                            <div className="detail-field">
+                                <label>Description</label>
+                                <p>{selectedTicket.description}</p>
+                            </div>
+                            <div className="detail-field">
+                                <label>Reporter</label><span>{selectedTicket.creator?.name || 'Unknown'}</span>
+                            </div>
+                            {selectedTicket.assignee && (
+                                <div className="detail-field">
+                                    <label>Assigned To</label><span>{selectedTicket.assignee.name}</span>
+                                </div>
+                            )}
+                            {selectedTicket.contactDetails && (
+                                <div className="detail-field">
+                                    <label>Contact</label><span>{selectedTicket.contactDetails}</span>
+                                </div>
+                            )}
+                            {selectedTicket.resolutionNotes && (
+                                <div className="detail-field">
+                                    <label>Resolution Notes</label><p>{selectedTicket.resolutionNotes}</p>
+                                </div>
+                            )}
+
+                            {/* Comments Section */}
+                            <div className="comments-section">
+                                <h3><FiMessageSquare /> Comments ({comments.length})</h3>
+                                <div className="comments-list">
+                                    {comments.map(comment => (
+                                        <div key={comment.id} className="comment-item">
+                                            <div className="comment-header">
+                                                <strong>{comment.user?.name || 'User'}</strong>
+                                                <span>{comment.createdAt ? new Date(comment.createdAt).toLocaleString() : ''}</span>
+                                            </div>
+                                            {editingComment?.id === comment.id ? (
+                                                <div className="comment-edit">
+                                                    <input
+                                                        type="text"
+                                                        value={editingComment.content}
+                                                        onChange={e => setEditingComment({ ...editingComment, content: e.target.value })}
+                                                        className="input-field"
+                                                    />
+                                                    <button className="icon-btn approve" onClick={() => handleEditComment(comment.id)}><FiCheck /></button>
+                                                    <button className="icon-btn reject" onClick={() => setEditingComment(null)}><FiX /></button>
+                                                </div>
+                                            ) : (
+                                                <div className="comment-body">
+                                                    <p>{comment.content}</p>
+                                                    {comment.user?.id === user?.id && (
+                                                        <div className="comment-actions">
+                                                            <button onClick={() => setEditingComment({ id: comment.id, content: comment.content })} title="Edit"><FiEdit2 /></button>
+                                                            <button onClick={() => handleDeleteComment(comment.id)} title="Delete"><FiTrash2 /></button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="comment-input">
+                                    <input
+                                        type="text"
+                                        value={newComment}
+                                        onChange={e => setNewComment(e.target.value)}
+                                        onKeyPress={e => e.key === 'Enter' && handleAddComment()}
+                                        placeholder="Add a comment..."
+                                        className="input-field"
+                                    />
+                                    <button className="btn btn-primary" onClick={handleAddComment}><FiSend /></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
