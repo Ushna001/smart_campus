@@ -6,7 +6,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -18,6 +20,8 @@ import java.util.Collections;
  * In a real production environment, this filter should be disabled or protected by a conditional.
  */
 public class DevAuthFilter extends OncePerRequestFilter {
+
+    private final RequestAttributeSecurityContextRepository securityContextRepository = new RequestAttributeSecurityContextRepository();
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -32,7 +36,11 @@ public class DevAuthFilter extends OncePerRequestFilter {
             UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                     "mock-user", null, Collections.singletonList(new SimpleGrantedAuthority(authority)));
             
-            SecurityContextHolder.getContext().setAuthentication(auth);
+            // In Spring Security 6, we must explicitly save the context to the repository
+            SecurityContext context = SecurityContextHolder.createEmptyContext();
+            context.setAuthentication(auth);
+            SecurityContextHolder.setContext(context);
+            securityContextRepository.saveContext(context, request, response);
             
             // Wrap the request to hide the mock token from subsequent filters (like Google JWT filter)
             HeaderMaskingRequestWrapper wrappedRequest = new HeaderMaskingRequestWrapper(request);
