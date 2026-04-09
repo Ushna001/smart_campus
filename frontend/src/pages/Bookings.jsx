@@ -40,7 +40,14 @@ const Bookings = () => {
                 setBookings(updated);
             })
             .catch(err => {
-                console.error("DB update failed, doing local mutation", err);
+                console.error("DB update failed:", err);
+                if (err.response) {
+                    const errorMsg = err.response.data?.message || err.response.data || err.message;
+                    alert(`Action failed: ${errorMsg}`);
+                    return;
+                }
+                
+                // Fallback ONLY if backend completely offline
                 const updated = bookings.map(b => b.id === id ? { ...b, status: newStatus } : b);
                 setBookings(updated);
                 

@@ -80,18 +80,26 @@ const Tickets = () => {
             })
             .catch(err => {
                 console.error("Error creating ticket:", err);
-                // Fallback mock
-                const newTicket = {
-                    id: Date.now(),
-                    ...ticketData,
-                    creator: { id: user.id, name: user.name },
-                    status: 'OPEN',
-                    createdAt: new Date().toISOString(),
-                    assignee: null
-                };
-                setTickets(prev => [newTicket, ...prev]);
-                setShowCreateModal(false);
-                showToast('Ticket created (locally)!');
+                const errorMsg = err.response?.data?.message || err.response?.data || err.message;
+
+                if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+                    showToast(`Security Error: ${errorMsg}. Please login again.`);
+                } else if (err.response) {
+                    showToast(`Server Error: ${errorMsg}`);
+                } else {
+                    // Fallback mock ONLY if server is completely unreachable
+                    const newTicket = {
+                        id: Date.now(),
+                        ...ticketData,
+                        creator: { id: user.id, name: user.name },
+                        status: 'OPEN',
+                        createdAt: new Date().toISOString(),
+                        assignee: null
+                    };
+                    setTickets(prev => [newTicket, ...prev]);
+                    setShowCreateModal(false);
+                    showToast('Ticket created locally (Backend Offline)');
+                }
             });
     };
 
@@ -103,8 +111,8 @@ const Tickets = () => {
                 showToast(`Ticket #${ticketId} updated to ${newStatus}`);
             })
             .catch(err => {
-                setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: newStatus } : t));
-                showToast(`Ticket #${ticketId} updated locally to ${newStatus}`);
+                const errorMsg = err.response?.data?.message || err.response?.data || err.message;
+                showToast(`Failed to update status: ${errorMsg}`);
             });
     };
 
@@ -116,8 +124,8 @@ const Tickets = () => {
                 showToast(`Technician assigned to ticket #${ticketId}`);
             })
             .catch(err => {
-                setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: 'IN_PROGRESS', assignee: { id: 3, name: 'James Technician' } } : t));
-                showToast(`Technician assigned locally to ticket #${ticketId}`);
+                const errorMsg = err.response?.data?.message || err.response?.data || err.message;
+                showToast(`Failed to assign technician: ${errorMsg}`);
             });
     };
 
