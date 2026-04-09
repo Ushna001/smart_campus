@@ -7,14 +7,14 @@ const Login = () => {
     const { login, GOOGLE_CLIENT_ID } = useContext(AuthContext);
 
     useEffect(() => {
-        // Render the Google Sign-In button if SDK is loaded
-        if (window.google) {
+        // Render the Google Sign-In button if SDK is loaded and Client ID is configured
+        if (window.google && !GOOGLE_CLIENT_ID.includes("YOUR_GOOGLE")) {
             window.google.accounts.id.renderButton(
                 document.getElementById("googleSignInButton"),
-                { theme: "outline", size: "large", width: "100%" }
+                { theme: "outline", size: "large", width: "400" }
             );
         }
-    }, []);
+    }, [GOOGLE_CLIENT_ID]);
 
     return (
         <div className="login-container">

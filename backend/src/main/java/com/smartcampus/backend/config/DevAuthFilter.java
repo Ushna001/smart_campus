@@ -33,10 +33,30 @@ public class DevAuthFilter extends OncePerRequestFilter {
                     "mock-user", null, Collections.singletonList(new SimpleGrantedAuthority(authority)));
             
             SecurityContextHolder.getContext().setAuthentication(auth);
-        } else if (authHeader != null && authHeader.contains("MOCKED")) {
-            System.out.println(">>> DevAuthFilter: Header found but mismatched: " + authHeader);
-        }
+            
+            // Wrap the request to hide the mock token from subsequent filters (like Google JWT filter)
+            HeaderMaskingRequestWrapper wrappedRequest = new HeaderMaskingRequestWrapper(request);
+            filterChain.doFilter(wrappedRequest, response);
+            return;
+        } 
 
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * Specialized wrapper to "hide" the Authorization header from subsequent filters
+     */
+    private static class HeaderMaskingRequestWrapper extends jakarta.servlet.http.HttpServletRequestWrapper {
+        public HeaderMaskingRequestWrapper(jakarta.servlet.http.HttpServletRequest request) {
+            super(request);
+        }
+
+        @Override
+        public String getHeader(String name) {
+            if ("Authorization".equalsIgnoreCase(name)) {
+                return null;
+            }
+            return super.getHeader(name);
+        }
     }
 }
