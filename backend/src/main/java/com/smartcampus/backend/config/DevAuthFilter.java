@@ -58,5 +58,20 @@ public class DevAuthFilter extends OncePerRequestFilter {
             }
             return super.getHeader(name);
         }
+
+        @Override
+        public java.util.Enumeration<String> getHeaders(String name) {
+            if ("Authorization".equalsIgnoreCase(name)) {
+                return java.util.Collections.emptyEnumeration();
+            }
+            return super.getHeaders(name);
+        }
+
+        @Override
+        public java.util.Enumeration<String> getHeaderNames() {
+            java.util.List<String> names = java.util.Collections.list(super.getHeaderNames());
+            names.removeIf(n -> "Authorization".equalsIgnoreCase(n));
+            return java.util.Collections.enumeration(names);
+        }
     }
 }
