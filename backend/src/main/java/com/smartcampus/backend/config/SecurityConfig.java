@@ -45,7 +45,7 @@ public class SecurityConfig {
             .oauth2ResourceServer(oauth2 -> oauth2
                 .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
             )
-            .addFilterBefore(new DevAuthFilter(), org.springframework.security.web.access.intercept.AuthorizationFilter.class);
+            .addFilterBefore(new DevAuthFilter(), org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter.class);
 
         return http.build();
     }

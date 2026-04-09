@@ -22,10 +22,10 @@ public class DevAuthFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-
         String authHeader = request.getHeader("Authorization");
-
-        if (authHeader != null && authHeader.equals("Bearer MOCKED_JWT_TOKEN")) {
+        
+        if (authHeader != null && authHeader.toLowerCase().startsWith("bearer mocked_jwt_token")) {
+            System.out.println(">>> DevAuthFilter: Bypass triggered for " + request.getRequestURI());
             String mockRole = request.getHeader("X-Mock-Role");
             String authority = (mockRole != null) ? "ROLE_" + mockRole.toUpperCase() : "ROLE_USER";
 
@@ -33,6 +33,8 @@ public class DevAuthFilter extends OncePerRequestFilter {
                     "mock-user", null, Collections.singletonList(new SimpleGrantedAuthority(authority)));
             
             SecurityContextHolder.getContext().setAuthentication(auth);
+        } else if (authHeader != null && authHeader.contains("MOCKED")) {
+            System.out.println(">>> DevAuthFilter: Header found but mismatched: " + authHeader);
         }
 
         filterChain.doFilter(request, response);
