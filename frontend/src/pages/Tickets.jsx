@@ -11,6 +11,7 @@ const Tickets = () => {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [selectedTicket, setSelectedTicket] = useState(null);
     const [comments, setComments] = useState([]);
+    const [resources, setResources] = useState([]);
     const [newComment, setNewComment] = useState('');
     const [editingComment, setEditingComment] = useState(null);
     const [filterStatus, setFilterStatus] = useState('ALL');
@@ -36,6 +37,11 @@ const Tickets = () => {
                 setTickets(mock);
                 setLoading(false);
             });
+
+        // Also fetch resources for the dropdown
+        api.get('/resources')
+            .then(res => setResources(res.data))
+            .catch(() => setResources([]));
     };
 
     const showToast = (msg) => {
@@ -53,7 +59,8 @@ const Tickets = () => {
             category: formData.get('category'),
             description: formData.get('description'),
             priority: formData.get('priority'),
-            contactDetails: formData.get('contactDetails')
+            contactDetails: formData.get('contactDetails'),
+            resource: formData.get('resourceId') ? { id: parseInt(formData.get('resourceId')) } : null
         };
 
         const fd = new FormData();
@@ -278,7 +285,16 @@ const Tickets = () => {
                                 </select>
                             </div>
                             <div className="input-group">
-                                <label className="input-label">Location</label>
+                                <label className="input-label">Related Resource (Optional)</label>
+                                <select name="resourceId" className="input-field">
+                                    <option value="">-- No Specific Resource --</option>
+                                    {resources.map(res => (
+                                        <option key={res.id} value={res.id}>{res.name} ({res.location})</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="input-group">
+                                <label className="input-label">Location / Specific Area</label>
                                 <input type="text" name="location" placeholder="E.g., Building 1 - Lab A" className="input-field" required />
                             </div>
                             <div className="input-group">

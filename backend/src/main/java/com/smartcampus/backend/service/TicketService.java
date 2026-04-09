@@ -27,6 +27,7 @@ public class TicketService {
     private final NotificationService notificationService;
     private final FileStorageService fileStorageService;
     private final UserRepository userRepository;
+    private final com.smartcampus.backend.repository.ResourceRepository resourceRepository;
 
     public Ticket createTicket(Ticket ticket, MultipartFile[] files) {
         // Resolve managed user entity
@@ -34,6 +35,13 @@ public class TicketService {
             User creator = userRepository.findById(ticket.getCreator().getId())
                     .orElseThrow(() -> new ResourceNotFoundException("User not found"));
             ticket.setCreator(creator);
+        }
+
+        // Resolve managed resource entity if provided
+        if (ticket.getResource() != null && ticket.getResource().getId() != null) {
+            com.smartcampus.backend.model.entity.CampusResource resource = resourceRepository.findById(ticket.getResource().getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));
+            ticket.setResource(resource);
         }
 
         ticket.setStatus(TicketStatus.OPEN);
