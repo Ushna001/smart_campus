@@ -311,9 +311,9 @@ const Tickets = () => {
                             </div>
                             <div className="input-group">
                                 <label className="input-label">Priority</label>
-                                <select name="priority" className="input-field" required>
+                                <select name="priority" className="input-field" defaultValue="MEDIUM" required>
                                     <option value="LOW">Low</option>
-                                    <option value="MEDIUM" selected>Medium</option>
+                                    <option value="MEDIUM">Medium</option>
                                     <option value="HIGH">High</option>
                                     <option value="CRITICAL">Critical</option>
                                 </select>

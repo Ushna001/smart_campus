@@ -77,7 +77,7 @@ public class SecurityConfig {
             "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"
         ));
         configuration.setAllowedHeaders(Arrays.asList(
-            "Authorization", "Content-Type", "x-auth-token"
+            "Authorization", "Content-Type", "x-auth-token", "x-mock-role"
         ));
         configuration.setExposedHeaders(Arrays.asList("x-auth-token"));
         configuration.setAllowCredentials(true);
