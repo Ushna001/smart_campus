@@ -36,10 +36,10 @@
 ## 👥 Team Contributions
 | Member Name | Student ID | Implemented Module | Key Endpoints |
 | :--- | :--- | :--- | :--- |
-| **Member 1** | ITXXXXXXXX | Facilities Catalogue | [cite_start]GET, POST, PUT, DELETE `/api/facilities` [cite: 76] |
-| **Member 2** | ITXXXXXXXX | Booking Workflow | [cite_start]GET, POST, PATCH, DELETE `/api/bookings` [cite: 77] |
-| **Member 3** | ITXXXXXXXX | Incident Tickets | [cite_start]GET, POST, PUT, DELETE `/api/tickets` [cite: 78] |
-| **Member 4** | ITXXXXXXXX | Notifications/OAuth | [cite_start]GET, POST, PATCH, DELETE `/api/notifications` [cite: 79] |
+| **Member 1** | IT23262768 | Facilities Catalogue | [cite_start]GET, POST, PUT, DELETE `/api/facilities` [cite: 76] |
+| **Member 2** | IT23436312 | Booking Workflow | [cite_start]GET, POST, PATCH, DELETE `/api/bookings` [cite: 77] |
+| **Member 3** | IT23289048 | Incident Tickets | [cite_start]GET, POST, PUT, DELETE `/api/tickets` [cite: 78] |
+| **Member 4** | IT23341104 | Notifications/OAuth | [cite_start]GET, POST, PATCH, DELETE `/api/notifications` [cite: 79] |
 
 ## ⚙️ Setup & Installation
 
